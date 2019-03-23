@@ -151,6 +151,7 @@ class AlphaBetaPruned(MiniMax):
             max_value = float("-inf")
             max_hero = 0
 
+             # this bad but need balanced tree
             for i in sorted(available_players):
 
                 available_players.remove(i)
@@ -176,6 +177,7 @@ class AlphaBetaPruned(MiniMax):
             min_value = float("inf")
             min_hero = 0
 
+            # this bad but need balanced tree
             for i in sorted(available_players):
 
                 available_players.remove(i)
