@@ -3,7 +3,7 @@ import pytest
 from shutil import copyfile
 
 @pytest.mark.parametrize("input_file_num,output_file_num", [
-    (0,0)
+    (i, i) for i in range(10)
 ])
 def test_files(input_file_num, output_file_num):
     input_file_name = "test_cases/input{}.txt".format(input_file_num)

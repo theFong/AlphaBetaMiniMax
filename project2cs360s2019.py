@@ -1,4 +1,5 @@
 import pandas as pd
+import copy
 
 def build_game_frame(file_name):
     with open(file_name, "r") as f:
@@ -26,9 +27,10 @@ def main():
     next_hero = None
 
     if game_frame["alg"] == "minimax":
-        # next_hero = apply_minimax(game_frame["heroes"])
-        mm = MiniMax(game_frame["heroes"])
-        next_hero = mm.run()
+        # mm = MiniMax(game_frame["heroes"])
+        # next_hero = mm.run()
+        ab = AlphaBetaPruned(game_frame["heroes"])
+        next_hero = ab.run()
     elif game_frame["alg"] == "ab":
         ab = AlphaBetaPruned(game_frame["heroes"])
         next_hero = ab.run()
@@ -44,7 +46,7 @@ class MiniMax(object):
         self.init_max_heroes = set(self.get_selected_players(heroes_df, 1).index.tolist())
         self.init_min_heroes = set(self.get_selected_players(heroes_df, 2).index.tolist())
 
-        self.heroes_data = { i : { "power" : r["power"], "mastery_i" : r["mastery_i"], "mastery_j" : r["mastery_j"] } for i, r in heroes_df[["power", "mastery_i", "mastery_j"]].iterrows() }
+        self.heroes_data = { i : { "power" : r["power"], 1 : r["mastery_i"], 2 : r["mastery_j"] } for i, r in heroes_df[["power", "mastery_i", "mastery_j"]].iterrows() }
     def get_available_players(self, heroes_df):
         return heroes_df.loc[heroes_df["team_id"] == 0]
     
@@ -95,7 +97,7 @@ class MiniMax(object):
                     min_hero = i
                 elif val == min_value and i < min_hero:
                     min_hero = i
-
+                    
                 available_players.add(i)
                 min_heroes.remove(i)
 
@@ -111,23 +113,16 @@ class MiniMax(object):
 
     def calc_player_advantage(self, heroes_selected, player_id):
         # (synergy_bonus + sum(mastery_i * power_i)
-        synergy_bonus = self.calc_synergy(heroes_selected)
+        synergy_bonus, _ = self.calc_synergy(heroes_selected)
+
         weighted_power = self.calc_weighted_power(heroes_selected, player_id)
         return synergy_bonus + weighted_power
 
     def calc_weighted_power(self, heroes_selected, player_id):
         # sum(mastery_i * power_i)
-        mastery_column = ""
-        if player_id == 1:
-            mastery_column = "mastery_i"
-        elif player_id == 2:
-            mastery_column = "mastery_j"
-        else:
-            raise(Exception("Invalid player id when calculating advantage"))
-
         total = 0
         for h in heroes_selected:
-            total += self.heroes_data[h][mastery_column] * self.heroes_data[h]["power"]
+            total += self.heroes_data[h][player_id] * self.heroes_data[h]["power"]
         return total
 
     def calc_synergy(self, heroes_selected):
@@ -135,9 +130,9 @@ class MiniMax(object):
         for i in heroes_selected:
             last = str(i)[-1]
             if last in last_set:
-                return 0 # not unique
+                return 0, last_set
             last_set.add(last)
-        return 120
+        return 120, last_set
 
 class AlphaBetaPruned(MiniMax):
 
@@ -145,9 +140,9 @@ class AlphaBetaPruned(MiniMax):
         super(AlphaBetaPruned, self).__init__(heroes_df)
     
     def run(self):
-        return self.alpha_beta(self.init_max_heroes, self.init_min_heroes, self.init_available, True, float("-inf"), float("inf"))[1]
+        return self.alpha_beta(self.init_max_heroes, self.init_min_heroes, self.init_available, True, { "alpha" : float("-inf"), "beta" : float("inf")} )[1]
 
-    def alpha_beta(self, max_heroes, min_heroes, available_players, isMaxPlayer, alpha, beta):
+    def alpha_beta(self, max_heroes, min_heroes, available_players, isMaxPlayer, params):
         if self.get_num_selected_players(max_heroes, min_heroes) == 10:
             return self.calc_advantage(max_heroes, min_heroes), 0
 
@@ -160,7 +155,7 @@ class AlphaBetaPruned(MiniMax):
                 available_players.remove(i)
                 max_heroes.add(i)
 
-                val, _ = self.minimax(max_heroes, min_heroes, available_players, not isMaxPlayer)
+                val, _ = self.alpha_beta(max_heroes, min_heroes, available_players, not isMaxPlayer, params)
                 # max
                 if val > max_value:
                     max_hero = i
@@ -171,8 +166,8 @@ class AlphaBetaPruned(MiniMax):
                 available_players.add(i)
                 max_heroes.remove(i)
 
-                alpha = max(alpha, max_value)
-                if alpha >= beta:
+                params["alpha"] = max(params["alpha"], max_value)
+                if params["alpha"] >= params["beta"]:
                     break
 
             return max_value, max_hero
@@ -185,7 +180,7 @@ class AlphaBetaPruned(MiniMax):
                 available_players.remove(i)
                 min_heroes.add(i)
 
-                val, _ = self.minimax(max_heroes, min_heroes, available_players, not isMaxPlayer)
+                val, _ = self.alpha_beta(max_heroes, min_heroes, available_players, not isMaxPlayer, params)
                 # min
                 if val < min_value:
                     min_value = val
@@ -196,8 +191,8 @@ class AlphaBetaPruned(MiniMax):
                 available_players.add(i)
                 min_heroes.remove(i)
 
-                beta = min(beta, min_value)
-                if alpha >= beta:
+                params["beta"] = min(params["beta"], min_value)
+                if params["alpha"] >= params["beta"]:
                     break
 
             return min_value, min_hero
