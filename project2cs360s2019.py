@@ -1,5 +1,6 @@
 import pandas as pd
 import copy
+import bisect
 
 def build_game_frame(file_name):
     with open(file_name, "r") as f:
@@ -11,7 +12,7 @@ def build_game_frame(file_name):
             heroes.append([int(row[0]), float(row[1]), float(row[2]), float(row[3]), int(row[4])])
         heroes = pd.DataFrame(heroes, columns=["id", "power", "mastery_i", "mastery_j", "team_id"])
         heroes.set_index("id", inplace=True)
-        heroes.sort_index(inplace=True,)
+        # heroes.sort_index(inplace=True,)
     return { "n" : num_heroes, "alg" : alg, "heroes" : heroes}
 
 def write_output(hero_id, file_name):
@@ -113,7 +114,7 @@ class MiniMax(object):
 
     def calc_player_advantage(self, heroes_selected, player_id):
         # (synergy_bonus + sum(mastery_i * power_i)
-        synergy_bonus, _ = self.calc_synergy(heroes_selected)
+        synergy_bonus = self.calc_synergy(heroes_selected)
 
         weighted_power = self.calc_weighted_power(heroes_selected, player_id)
         return synergy_bonus + weighted_power
@@ -128,11 +129,11 @@ class MiniMax(object):
     def calc_synergy(self, heroes_selected):
         last_set = set()
         for i in heroes_selected:
-            last = str(i)[-1]
+            last = i % 10
             if last in last_set:
-                return 0, last_set
+                return 0
             last_set.add(last)
-        return 120, last_set
+        return 120
 
 class AlphaBetaPruned(MiniMax):
 
@@ -140,9 +141,9 @@ class AlphaBetaPruned(MiniMax):
         super(AlphaBetaPruned, self).__init__(heroes_df)
     
     def run(self):
-        return self.alpha_beta(self.init_max_heroes, self.init_min_heroes, self.init_available, True, { "alpha" : float("-inf"), "beta" : float("inf")} )[1]
+        return self.alpha_beta(self.init_max_heroes, self.init_min_heroes, self.init_available, True, float("-inf"), float("inf") )[1]
 
-    def alpha_beta(self, max_heroes, min_heroes, available_players, isMaxPlayer, params):
+    def alpha_beta(self, max_heroes, min_heroes, available_players, isMaxPlayer, alpha, beta):
         if self.get_num_selected_players(max_heroes, min_heroes) == 10:
             return self.calc_advantage(max_heroes, min_heroes), 0
 
@@ -150,12 +151,12 @@ class AlphaBetaPruned(MiniMax):
             max_value = float("-inf")
             max_hero = 0
 
-            for i in available_players:
+            for i in sorted(available_players):
 
                 available_players.remove(i)
                 max_heroes.add(i)
 
-                val, _ = self.alpha_beta(max_heroes, min_heroes, available_players, not isMaxPlayer, params)
+                val, _ = self.alpha_beta(max_heroes, min_heroes, available_players, not isMaxPlayer, alpha, beta)
                 # max
                 if val > max_value:
                     max_hero = i
@@ -166,8 +167,8 @@ class AlphaBetaPruned(MiniMax):
                 available_players.add(i)
                 max_heroes.remove(i)
 
-                params["alpha"] = max(params["alpha"], max_value)
-                if params["alpha"] >= params["beta"]:
+                alpha = max(alpha, max_value)
+                if alpha >= beta:
                     break
 
             return max_value, max_hero
@@ -175,12 +176,12 @@ class AlphaBetaPruned(MiniMax):
             min_value = float("inf")
             min_hero = 0
 
-            for i in available_players:
+            for i in sorted(available_players):
 
                 available_players.remove(i)
                 min_heroes.add(i)
 
-                val, _ = self.alpha_beta(max_heroes, min_heroes, available_players, not isMaxPlayer, params)
+                val, _ = self.alpha_beta(max_heroes, min_heroes, available_players, not isMaxPlayer, alpha, beta)
                 # min
                 if val < min_value:
                     min_value = val
@@ -191,8 +192,8 @@ class AlphaBetaPruned(MiniMax):
                 available_players.add(i)
                 min_heroes.remove(i)
 
-                params["beta"] = min(params["beta"], min_value)
-                if params["alpha"] >= params["beta"]:
+                beta = min(beta, min_value)
+                if alpha >= beta:
                     break
 
             return min_value, min_hero
