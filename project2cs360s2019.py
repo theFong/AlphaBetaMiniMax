@@ -28,10 +28,10 @@ def main():
     next_hero = None
 
     if game_frame["alg"] == "minimax":
-        # mm = MiniMax(game_frame["heroes"])
-        # next_hero = mm.run()
-        ab = AlphaBetaPruned(game_frame["heroes"])
-        next_hero = ab.run()
+        mm = MiniMax(game_frame["heroes"])
+        next_hero = mm.run()
+        # ab = AlphaBetaPruned(game_frame["heroes"])
+        # next_hero = ab.run()
     elif game_frame["alg"] == "ab":
         ab = AlphaBetaPruned(game_frame["heroes"])
         next_hero = ab.run()
